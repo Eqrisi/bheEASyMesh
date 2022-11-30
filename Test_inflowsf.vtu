@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<VTKFile type="UnstructuredGrid" version="0.1" byte_order="LittleEndian" header_type="UInt32" compressor="vtkZLibDataCompressor">
+  <UnstructuredGrid>
+    <Piece NumberOfPoints="20"                   NumberOfCells="5"                   >
+      <PointData>
+        <DataArray type="Float64" Name="temperature_soil" format="appended" RangeMin="11.388662338"         RangeMax="11.448113784"         offset="0"                   />
+        <DataArray type="UInt64" Name="bulk_node_ids" format="appended" RangeMin="930"                  RangeMax="1103"                 offset="64"                  />
+      </PointData>
+      <CellData>
+        <DataArray type="UInt64" Name="bulk_element_ids" format="appended" RangeMin="1"                    RangeMax="1"                    offset="168"                 />
+      </CellData>
+      <Points>
+        <DataArray type="Float32" Name="Points" NumberOfComponents="3" format="appended" RangeMin="11.404494728"         RangeMax="27.213278009"         offset="212"                 />
+      </Points>
+      <Cells>
+        <DataArray type="Int64" Name="connectivity" format="appended" RangeMin=""                     RangeMax=""                     offset="320"                 />
+        <DataArray type="Int64" Name="offsets" format="appended" RangeMin=""                     RangeMax=""                     offset="408"                 />
+        <DataArray type="UInt8" Name="types" format="appended" RangeMin=""                     RangeMax=""                     offset="464"                 />
+      </Cells>
+    </Piece>
+  </UnstructuredGrid>
+  <AppendedData encoding="base64">
+   _AQAAAACAAACgAAAAHgAAAA==eJzT1WvQzn+q5qALpfWC/+//dwxB6w6wPAD780ebAQAAAACAAACgAAAAOgAAAA==eJxbxMwABhuhtA8LhLaF0puh4lugtD9U3I8FVd8mKO3LgmoOTBxmDkwfTB3M3MVQ2o4F1R4AaD8KBw==AQAAAACAAAAoAAAADgAAAA==eJxjZIAARgI0AACgAAY=AQAAAACAAADwAAAAPwAAAA==eJxjYDhxkAEMVIB0ARa2DpA+gcRe4ICkxhGTjaxGB83MBQcw2TpodqGoccBk66DrRXLDCSxsHRS3AQAibSfhAQAAAACAAACgAAAAMAAAAA==eJwtxUkCgBAAAECpiKLt/391MHOZEKbF0as3707OPlxcffpyc/ftx68//x4qMAC/AQAAAACAAAAoAAAAFgAAAA==eJxjYYAADijNA6UFoLQIlAYABIgAPQ==AQAAAACAAAAFAAAACwAAAA==eJzj5AQCAACMAC4=
+  </AppendedData>
+</VTKFile>
