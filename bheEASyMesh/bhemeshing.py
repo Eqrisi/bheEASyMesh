@@ -236,16 +236,16 @@ class BHEMesh():
         gmsh.model.geo.addCurveLoop(lines_list, 1)
         gmsh.model.geo.addPlaneSurface([1], 1)
         if 'box' in self.geom:
-            for box in self.geom['box']:
+            for i in self.geom['box']:
                 lines_list = []
                 point_idx +=1
-                gmsh.model.geo.add_point(box[0] + box[2], box[1], 0, box[4], point_idx)
+                gmsh.model.geo.add_point(self.geom['box'][i]['Origin'][0] + self.geom['box'][i]['Width'], self.geom['box'][i]['Origin'][1], 0, self.geom['box'][i]['Elem_size'], point_idx)
                 point_idx +=1
-                gmsh.model.geo.add_point(box[0], box[1], 0, box[4], point_idx)
+                gmsh.model.geo.add_point(self.geom['box'][i]['Origin'][0], self.geom['box'][i]['Origin'][1], 0, self.geom['box'][i]['Elem_size'], point_idx)
                 point_idx +=1
-                gmsh.model.geo.add_point(box[0], box[1] + box[3], 0, box[4], point_idx)
+                gmsh.model.geo.add_point(self.geom['box'][i]['Origin'][0], self.geom['box'][i]['Origin'][1] + self.geom['box'][i]['Length'], 0, self.geom['box'][i]['Elem_size'], point_idx)
                 point_idx +=1
-                gmsh.model.geo.add_point(box[0] + box[2], box[1] + box[3], 0, box[4], point_idx)
+                gmsh.model.geo.add_point(self.geom['box'][i]['Origin'][0] + self.geom['box'][i]['Width'], self.geom['box'][i]['Origin'][1] + self.geom['box'][i]['Length'], 0, self.geom['box'][i]['Elem_size'], point_idx)
                 line_idx += 1
                 gmsh.model.geo.add_line(line_idx, point_idx - 2, point_idx - 3)
                 lines_list.append(line_idx)
