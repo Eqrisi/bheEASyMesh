@@ -3,8 +3,6 @@ import gmsh
 import numpy as np
 from vtk import *
 from vtk.util import numpy_support
-from vtk.util.numpy_support import vtk_to_numpy ## Only for Check_mesh
-import pandas as pd ## Only for Check_mesh
 from scipy import interpolate
 
 
@@ -451,30 +449,35 @@ class BHEMesh():
 
     def write_soil_temperature_IC(self, temperature_IC):
         self.use_temp_IC = True
-        seasonal = temperature_IC['seasonal']
-        neutral = temperature_IC['neutral']
-        gradient = temperature_IC['gradient']
-        surface_temp = temperature_IC['sf_temp']
-        self.node_array = np.append(self.node_array, np.zeros((len(self.node_array),1)), axis = 1)
-        if "seasonal_curve" in temperature_IC: 
-            spline = interpolate.CubicSpline(temperature_IC['seasonal_curve'][0], temperature_IC['seasonal_curve'][1])
-            neutral_temp = spline(seasonal)
-            for i in range(len(self.node_array)):
-                if self.node_array[i][2] > seasonal:
-                    self.node_array[i][3] = spline(self.node_array[i][2])
-                elif self.node_array[i][2] <= seasonal and self.node_array[i][2] >= neutral:
-                    self.node_array[i][3] = neutral_temp
-                else:
-                    self.node_array[i][3] = neutral_temp + gradient*(abs(self.node_array[i][2]-neutral))
-        else:
-            neutral_temp = temperature_IC['reference'][1]-abs(temperature_IC['reference'][0]-neutral)*gradient
-            for i in range(len(self.node_array)):
-                if self.node_array[i][2] > seasonal:
-                    self.node_array[i][3] = surface_temp - (surface_temp - neutral_temp) / abs(seasonal) * abs(self.node_array[i][2])
-                elif self.node_array[i][2] <= seasonal and self.node_array[i][2] >= neutral:
-                    self.node_array[i][3] = neutral_temp
-                else:
-                    self.node_array[i][3] = neutral_temp + gradient*(abs(self.node_array[i][2]-neutral))
+        if temperature_IC['type'] == "profile":
+            seasonal = temperature_IC['seasonal']
+            neutral = temperature_IC['neutral']
+            gradient = temperature_IC['gradient']
+            surface_temp = temperature_IC['sf_temp']
+            self.node_array = np.append(self.node_array, np.zeros((len(self.node_array),1)), axis = 1)
+            if "seasonal_curve" in temperature_IC: 
+                spline = interpolate.CubicSpline(temperature_IC['seasonal_curve'][0], temperature_IC['seasonal_curve'][1])
+                neutral_temp = spline(seasonal)
+                for i in range(len(self.node_array)):
+                    if self.node_array[i][2] > seasonal:
+                        self.node_array[i][3] = spline(self.node_array[i][2])
+                    elif self.node_array[i][2] <= seasonal and self.node_array[i][2] >= neutral:
+                        self.node_array[i][3] = neutral_temp
+                    else:
+                        self.node_array[i][3] = neutral_temp + gradient*(abs(self.node_array[i][2]-neutral))
+            else:
+                neutral_temp = temperature_IC['reference'][1]-abs(temperature_IC['reference'][0]-neutral)*gradient
+                for i in range(len(self.node_array)):
+                    if self.node_array[i][2] > seasonal:
+                        self.node_array[i][3] = surface_temp - (surface_temp - neutral_temp) / abs(seasonal) * abs(self.node_array[i][2])
+                    elif self.node_array[i][2] <= seasonal and self.node_array[i][2] >= neutral:
+                        self.node_array[i][3] = neutral_temp
+                    else:
+                        self.node_array[i][3] = neutral_temp + gradient*(abs(self.node_array[i][2]-neutral))
+        elif temperature_IC['type'] == "fixed":
+            self.node_array = np.append(self.node_array, np.full((len(self.node_array),1), temperature_IC['fix_temp']), axis = 1)
+        else: 
+            print("No temperature IC was applied, because no type of temperature IC was specified.")
 
 
     def write_mesh_to_VTK (self):
@@ -501,7 +504,7 @@ class BHEMesh():
         material_ID = []
         element_type = []
         for i in range(len(self.prism_array)):
-            prism_elements[i][0] = 6
+            prism_elements[i][0] = 6 ## Defines the number of nodes of the Element 
             prism_elements[i][1] = self.prism_array[i][4] ## Nodes were given in the wrong order, because the internal order of the vtu is different
             prism_elements[i][2] = self.prism_array[i][5]
             prism_elements[i][3] = self.prism_array[i][6]
@@ -512,7 +515,7 @@ class BHEMesh():
             material_ID.append(self.prism_array[i][0])
         # Write BHE Elements
         for i in range(len(self.bhe_array)):
-            bhe_elements[i][0] = 2 ##2 is number of nodes of the Element 
+            bhe_elements[i][0] = 2 ## Defines the number of nodes of the Element 
             element_type.append(VTK_LINE)
             material_ID.append(self.bhe_array[i][0])
         elements = np.append(prism_elements.ravel(),bhe_elements.ravel())
@@ -582,7 +585,7 @@ class BHEMesh():
             if '_inflow' in surface and 't_aqf' in self.geom:
                 if self.geom['t_aqf'] == 0:
                     sf_types.remove(surface)
-                    continue ## Testen
+                    continue
             elif '_inflow' in surface and not 't_aqf' in self.geom:
                 raise KeyError("The '_inflow' option can only be used in 'simple' mode")
             suffix = normals[surface]['suffix']
@@ -697,250 +700,3 @@ class BHEMesh():
             if self.node_array[node][2] > zmax or self.node_array[node][2] < zmin:
                 return True
         return False
-    
-    #TODO Remove check_mesh 
-    def check_mesh (self, filename, meshInput, Len, t_aqf, z_aqf):
-        """ This function is for developing purposes 
-            to test the accuracy of the meshing process 
-            with a large number of meshes. 
-            Value errors will be raised if model 
-            dimensions or bhe position and dimesion or 
-            material-ids do not match the requirements    
-        """
-
-        # Read mesh
-        reader = vtkXMLUnstructuredGridReader()
-        reader.SetFileName(filename)
-        reader.Update()
-        mesh = reader.GetOutput()
-        elem_in = vtk_to_numpy(mesh.GetCells().GetData())
-        points = vtk_to_numpy(mesh.GetPoints().GetData())
-        ids = vtk_to_numpy(mesh.GetCellData().GetArray('MaterialIDs'))
-        i = 0
-        n_prisms = 0
-        n_lines = 0
-        prism_elems_maxima = []
-        line_elems_maxima = []
-        while i < len(elem_in):
-            if elem_in[i] == 6:
-                prism_elems_maxima.append([min(points[elem_in[i + 1]][0], 
-                                            points[elem_in[i + 2]][0], 
-                                            points[elem_in[i + 3]][0], 
-                                            points[elem_in[i + 4]][0], 
-                                            points[elem_in[i + 5]][0], 
-                                            points[elem_in[i + 6]][0]),
-                                        max(points[elem_in[i + 1]][0], 
-                                            points[elem_in[i + 2]][0], 
-                                            points[elem_in[i + 3]][0], 
-                                            points[elem_in[i + 4]][0], 
-                                            points[elem_in[i + 5]][0], 
-                                            points[elem_in[i + 6]][0]),
-                                        min(points[elem_in[i + 1]][1], 
-                                            points[elem_in[i + 2]][1], 
-                                            points[elem_in[i + 3]][1], 
-                                            points[elem_in[i + 4]][1], 
-                                            points[elem_in[i + 5]][1], 
-                                            points[elem_in[i + 6]][1]),
-                                        max(points[elem_in[i + 1]][1], 
-                                            points[elem_in[i + 2]][1], 
-                                            points[elem_in[i + 3]][1], 
-                                            points[elem_in[i + 4]][1], 
-                                            points[elem_in[i + 5]][1], 
-                                            points[elem_in[i + 6]][1]),
-                                        min(points[elem_in[i + 1]][2], 
-                                            points[elem_in[i + 2]][2], 
-                                            points[elem_in[i + 3]][2], 
-                                            points[elem_in[i + 4]][2], 
-                                            points[elem_in[i + 5]][2], 
-                                            points[elem_in[i + 6]][2]),
-                                        max(points[elem_in[i + 1]][2], 
-                                            points[elem_in[i + 2]][2], 
-                                            points[elem_in[i + 3]][2], 
-                                            points[elem_in[i + 4]][2], 
-                                            points[elem_in[i + 5]][2], 
-                                            points[elem_in[i + 6]][2]),
-                                        ids[n_prisms]])                  
-                n_prisms += 1
-            elif elem_in[i] == 2:
-                if points[elem_in[i + 1]][0] == points[elem_in[i + 2]][0] and points[elem_in[i + 1]][1] == points[elem_in[i + 2]][1]:
-                    line_elems_maxima.append([points[elem_in[i + 1]][0],
-                                    points[elem_in[i + 1]][1],
-                                    min(points[elem_in[i + 1]][2],
-                                        points[elem_in[i + 2]][2]),
-                                    max(points[elem_in[i + 1]][2],
-                                        points[elem_in[i + 2]][2]),
-                                    ids[n_lines+n_prisms]])
-                else:
-                    raise ValueError("X or y coordinates are different within one line element")
-                n_lines += 1
-            i += elem_in[i] + 1
-        prisms = pd.DataFrame(prism_elems_maxima, columns = ["min_x", "max_x", "min_y", "max_y", "min_z", "max_z", "MaterialID"])
-        lines = pd.DataFrame(line_elems_maxima, columns = ["x", "y", "min_z", "max_z", "MaterialID"])
-        
-        # Test mesh:
-        layer_tolerance = 1e-5
-         # Check model dimensions:
-        if prisms['max_x'].max() - prisms['min_x'].min() != meshInput['WIDTH']:
-            raise ValueError("Model has the wrong width!\n Width should be " + str(meshInput['WIDTH']) + " and is " + str(prisms['max_x'].max() - prisms['min_x'].min()))
-        if prisms['max_y'].max() - prisms['min_y'].min() != meshInput['LENGTH']:
-            raise ValueError("Model has the wrong length!\n Length should be " + str(meshInput['LENGTH']) + " and is " + str(prisms['max_y'].max() - prisms['min_y'].min()))
-        if prisms['max_z'].max() - prisms['min_z'].min() != abs(meshInput['BHEtopend']) + Len + abs(meshInput['zExt']) and abs((prisms['max_z'].max() - prisms['min_z'].min())-(abs(meshInput['BHEtopend']) + Len + abs(meshInput['zExt']))) >= 1e-5:
-            raise ValueError("Model has the wrong depth!\n Depth should be " + str(abs(meshInput['BHEtopend']) + Len + abs(meshInput['zExt'])) + " and is " + str(prisms['max_z'].max() - prisms['min_z'].min()))
-
-         # Check Material-ids: 
-        if meshInput['inflow_max_z'] - z_aqf - t_aqf <= meshInput['BHEtopend'] - Len - meshInput['zExt']:
-            aqf_bottom = meshInput['BHEtopend'] - Len - meshInput['zExt']
-        else:
-            aqf_bottom = meshInput['inflow_max_z'] - z_aqf - t_aqf
-        for i in range(len(prism_elems_maxima)):
-            if prisms.loc[i,"min_z"] >= meshInput["inflow_max_z"] - z_aqf - layer_tolerance:
-                if prisms.loc[i,"MaterialID"] != 0:
-                    raise ValueError("Wrong MaterialID above aquifer. \n At " + str(prisms.loc[i,"min_z"]) + " Material-ID is " + str(prisms.loc[i,"MaterialID"]) + " and should be 0")
-            elif prisms.loc[i,"min_z"] >= aqf_bottom - layer_tolerance:
-                if prisms.loc[i,"MaterialID"] != 1:
-                    raise ValueError("Wrong MaterialID in aquifer.\n At " + str(prisms.loc[i,"min_z"]) + " Material-ID is " + str(prisms.loc[i,"MaterialID"]) + " and should be 1")
-            elif prisms.loc[i,"min_z"] < aqf_bottom:
-                if prisms.loc[i,"MaterialID"] != 0:
-                    raise ValueError("Wrong MaterialID under aquifer. \n At " + str(prisms.loc[i,"min_z"]) + " Material-ID is " + str(prisms.loc[i,"MaterialID"]) + " and should be 0")
-        
-         # Check BHE position and length:
-        if lines.loc[0, 'x'] != meshInput["BHEpos"][0]:
-            raise ValueError("Line element has wrong x coordinate. \n X coordinate should be " + str(meshInput["BHEpos"][0]) + " and is " + str(lines.loc[0, 'x']))
-        if lines.loc[0, 'y'] != meshInput["BHEpos"][1]:
-            raise ValueError("Line element has wrong y coordinate. \n y coordinate should be " + str(meshInput["BHEpos"][1]) + " and is " + str(lines.loc[0, 'y']))
-        if lines['max_z'].max() != meshInput["BHEtopend"]:
-            raise ValueError("BHE has wrong topend. \n Topend should be at " + str(meshInput["BHEtopend"]) + " and is " + str(lines['max_z'].max()))
-        if lines['max_z'].max()-lines['min_z'].min() - Len >= layer_tolerance:
-            raise ValueError("BHE has wrong length. \n Length should be " + str(Len) + " and is " + str(lines['max_z'].max()-lines['min_z'].min()))
-        
-
-        # Check surface meshes:
-         # Inflowsf
-        if not self.geom['t_aqf'] == 0:
-            reader.SetFileName(filename.replace(".vtu", "_inflowsf.vtu"))
-            reader.Update()
-            inflow_sfmesh = reader.GetOutput()
-            elem_in = vtk_to_numpy(inflow_sfmesh.GetCells().GetData())
-            points = vtk_to_numpy(inflow_sfmesh.GetPoints().GetData())
-            i = 0
-            n_quads = 0
-            quad_elems_maxima = []
-            while i < len(elem_in):
-                if elem_in[i] == 4:
-                    quad_elems_maxima.append([min(points[elem_in[i + 1]][0], 
-                                                points[elem_in[i + 2]][0], 
-                                                points[elem_in[i + 3]][0], 
-                                                points[elem_in[i + 4]][0]),
-                                            max(points[elem_in[i + 1]][0], 
-                                                points[elem_in[i + 2]][0], 
-                                                points[elem_in[i + 3]][0], 
-                                                points[elem_in[i + 4]][0]),
-                                            min(points[elem_in[i + 1]][1], 
-                                                points[elem_in[i + 2]][1], 
-                                                points[elem_in[i + 3]][1], 
-                                                points[elem_in[i + 4]][1]),
-                                            max(points[elem_in[i + 1]][1], 
-                                                points[elem_in[i + 2]][1], 
-                                                points[elem_in[i + 3]][1], 
-                                                points[elem_in[i + 4]][1]),
-                                            min(points[elem_in[i + 1]][2], 
-                                                points[elem_in[i + 2]][2], 
-                                                points[elem_in[i + 3]][2], 
-                                                points[elem_in[i + 4]][2]),
-                                            max(points[elem_in[i + 1]][2], 
-                                                points[elem_in[i + 2]][2], 
-                                                points[elem_in[i + 3]][2], 
-                                                points[elem_in[i + 4]][2])])
-                    n_quads += 1
-                i += elem_in[i] + 1
-            quads = pd.DataFrame(quad_elems_maxima, columns = ["min_x", "max_x", "min_y", "max_y", "min_z", "max_z"])
-            # Check model dimensions:
-            if quads['max_x'].max() - quads['min_x'].min() != meshInput['WIDTH']:
-                raise ValueError("Model has the wrong width!\n Width should be " + str(meshInput['WIDTH']) + " and is " + str(quads['max_x'].max() - quads['min_x'].min()))
-            if quads['max_y'].max() != quads['min_y'].min() or quads['max_y'].max() != 0:
-                print(str(quads['max_y'].max()) + " " + str(quads['min_y'].min()))
-                print(str(quads['max_x'].max()) + " " + str(quads['min_x'].min()))
-                raise ValueError("Model has the wrong y coordinates!")
-            if quads['max_z'].max() - meshInput["inflow_max_z"] >= 1e-5:
-                raise ValueError("Model has the wrong max z-level!\n Z-level should be " + str(meshInput['inflow_max_z']) + " and is " + str(quads['max_z'].max()))
-            if quads['min_z'].min() - self.geom['z_aqf'] - self.geom['t_aqf'] >= 1e-5:
-                raise ValueError("Model has the wrong min z-level!\n Z-level should be " + str(- self.geom['z_aqf'] - self.geom['t_aqf']) + " and is " + str(quads['min_z'].min()))
-
-         # Topsf
-        reader.SetFileName(filename.replace(".vtu", "_topsf.vtu"))
-        reader.Update()
-        inflow_sfmesh = reader.GetOutput()
-        elem_in = vtk_to_numpy(inflow_sfmesh.GetCells().GetData())
-        points = vtk_to_numpy(inflow_sfmesh.GetPoints().GetData())
-        i = 0
-        n_triangs = 0
-        triangle_elems_maxima = []
-        while i < len(elem_in):
-            if elem_in[i] == 3:
-                triangle_elems_maxima.append([min(points[elem_in[i + 1]][0], 
-                                            points[elem_in[i + 2]][0], 
-                                            points[elem_in[i + 3]][0]),
-                                        max(points[elem_in[i + 1]][0], 
-                                            points[elem_in[i + 2]][0], 
-                                            points[elem_in[i + 3]][0]),
-                                        min(points[elem_in[i + 1]][1], 
-                                            points[elem_in[i + 2]][1], 
-                                            points[elem_in[i + 3]][1]),
-                                        max(points[elem_in[i + 1]][1], 
-                                            points[elem_in[i + 2]][1], 
-                                            points[elem_in[i + 3]][1]),
-                                        min(points[elem_in[i + 1]][2], 
-                                            points[elem_in[i + 2]][2], 
-                                            points[elem_in[i + 3]][2]),
-                                        max(points[elem_in[i + 1]][2], 
-                                            points[elem_in[i + 2]][2], 
-                                            points[elem_in[i + 3]][2])])
-                n_triangs += 1
-            i += elem_in[i] + 1
-        triangs = pd.DataFrame(triangle_elems_maxima, columns = ["min_x", "max_x", "min_y", "max_y", "min_z", "max_z"])
-        if triangs['max_x'].max() - triangs['min_x'].min() != meshInput['WIDTH']:
-            raise ValueError("Model has the wrong width!\n Width should be " + str(meshInput['WIDTH']) + " and is " + str(triangs['max_x'].max() - triangs['min_x'].min()))
-        if triangs['max_y'].max() - triangs['min_y'].min() != meshInput['LENGTH']:
-            raise ValueError("Model has the wrong y coordinates!\n Width should be " + str(meshInput['LENGTH']) + " and is " + str(triangs['max_y'].max() - triangs['min_y'].min()))
-        if triangs['max_z'].max() != triangs['min_z'].min() or triangs['min_z'].min() != 0:
-            raise ValueError("Model has the wrong z-level!\n Z-level should be " + str(0) + " and is " + str(triangs['max_z'].max()))
-        
-         # Bottomsf
-        reader.SetFileName(filename.replace(".vtu", "_bottomsf.vtu"))
-        reader.Update()
-        inflow_sfmesh = reader.GetOutput()
-        elem_in = vtk_to_numpy(inflow_sfmesh.GetCells().GetData())
-        points = vtk_to_numpy(inflow_sfmesh.GetPoints().GetData())
-        i = 0
-        n_triangs = 0
-        triangle_elems_maxima = []
-        while i < len(elem_in):
-            if elem_in[i] == 3:
-                triangle_elems_maxima.append([min(points[elem_in[i + 1]][0], 
-                                            points[elem_in[i + 2]][0], 
-                                            points[elem_in[i + 3]][0]),
-                                        max(points[elem_in[i + 1]][0], 
-                                            points[elem_in[i + 2]][0], 
-                                            points[elem_in[i + 3]][0]),
-                                        min(points[elem_in[i + 1]][1], 
-                                            points[elem_in[i + 2]][1], 
-                                            points[elem_in[i + 3]][1]),
-                                        max(points[elem_in[i + 1]][1], 
-                                            points[elem_in[i + 2]][1], 
-                                            points[elem_in[i + 3]][1]),
-                                        min(points[elem_in[i + 1]][2], 
-                                            points[elem_in[i + 2]][2], 
-                                            points[elem_in[i + 3]][2]),
-                                        max(points[elem_in[i + 1]][2], 
-                                            points[elem_in[i + 2]][2], 
-                                            points[elem_in[i + 3]][2])])
-                n_triangs += 1
-            i += elem_in[i] + 1
-        triangs = pd.DataFrame(triangle_elems_maxima, columns = ["min_x", "max_x", "min_y", "max_y", "min_z", "max_z"])
-        if triangs['max_x'].max() - triangs['min_x'].min() != meshInput['WIDTH']:
-            raise ValueError("Model has the wrong width!\n Width should be " + str(meshInput['WIDTH']) + " and is " + str(triangs['max_x'].max() - triangs['min_x'].min()))
-        if triangs['max_y'].max() - triangs['min_y'].min() != meshInput['LENGTH']:
-            raise ValueError("Model has the wrong y coordinates!\n Width should be " + str(meshInput['LENGTH']) + " and is " + str(triangs['max_y'].max() - triangs['min_y'].min()))
-        if triangs['max_z'].max() != triangs['min_z'].min() or triangs['min_z'].min() - meshInput['BHEtopend'] + Len + meshInput['zExt'] >= 1e-5:
-            raise ValueError("Model has the Z-Level!\n z-level should be " + str(meshInput['BHEtopend'] - Len - meshInput['zExt']) + " and is " + str(triangs['max_z'].max()))
-        print(" - Mesh check successful")
