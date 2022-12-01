@@ -21,7 +21,7 @@ class BHEMesh():
     """
 
 
-    def __init__(self, prefix, meshInput):
+    def __init__(self, prefix,  meshInput, mode):
         self.prefix = prefix
         self.geom = {}
         self.BHEs = {}
@@ -30,16 +30,23 @@ class BHEMesh():
         self.add_points ={}
         self.faces = {}
         self.use_temp_IC = False
+        max_depth = 0
+        for i in meshInput['BHEs']:
+            self.BHEs[str(i)] = {}
+            self.BHEs[str(i)]['bhe_number'] = i
+            self.BHEs[str(i)]['bhe_x'] = meshInput['BHEs'][i]['Position'][0]
+            self.BHEs[str(i)]['bhe_y'] = meshInput['BHEs'][i]['Position'][1]
+            self.BHEs[str(i)]['bhe_top'] = meshInput['BHEs'][i]['Topend']
+            self.BHEs[str(i)]['bhe_bottom'] = meshInput['BHEs'][i]['Topend'] - meshInput['BHEs'][i]['Length']
+            self.BHEs[str(i)]['bhe_radius'] = meshInput['BHEs'][i]['r_b']
+            self.BHEs[str(i)]['bhe_length'] = meshInput['BHEs'][i]['Length']
+            if  meshInput['BHEs'][i]['Length'] + abs(meshInput['BHEs'][i]['Topend']) > max_depth:
+                max_depth = meshInput['BHEs'][i]['Length'] + abs(meshInput['BHEs'][i]['Topend'])
         self.geom['width'] = meshInput['WIDTH']
         self.geom['length'] = meshInput['LENGTH']
-        self.geom['depth'] = meshInput['BHELen'] + meshInput['zExt'] + abs(meshInput['BHEtopend'])
-        self.geom['box'] = meshInput['BOX']
+        if 'BOXES' in meshInput:
+            self.geom['box'] = meshInput['BOXES']
         self.geom['elem_size'] = meshInput['ELEM_SIZE']
-        self.geom['dz'] = meshInput['dzLAYER']
-        self.geom['dz_ref'] = meshInput['dzREF']
-        self.geom['n_ref'] = meshInput['nREF']
-        self.geom['t_aqf'] = meshInput['t_aqf']
-        self.geom['z_aqf'] = meshInput['z_aqf'] + abs(meshInput['inflow_max_z'])
         if 'ADD_POINTS' in meshInput:
             for i in range(len(meshInput['ADD_POINTS'])):
                 this_point = {}
@@ -47,15 +54,20 @@ class BHEMesh():
                 this_point['y'] = meshInput['ADD_POINTS'][i][1]
                 this_point['delta'] = meshInput['ADD_POINTS'][i][2]
                 self.add_points[str(len(self.add_points))] = this_point
-        self.BHEs['0'] = {}
-        self.BHEs['0']['bhe_number'] = 0
-        self.BHEs['0']['bhe_x'] = meshInput['BHEpos'][0]
-        self.BHEs['0']['bhe_y'] = meshInput['BHEpos'][1]
-        self.BHEs['0']['bhe_top'] = meshInput['BHEtopend']
-        self.BHEs['0']['bhe_bottom'] = meshInput['BHEtopend'] - meshInput['BHELen']
-        self.BHEs['0']['bhe_radius'] = meshInput['r_b']
-        self.BHEs['0']['bhe_length'] = meshInput['BHELen']
-        self.create_layer_structure()
+        if mode == 'simple':
+            self.geom['depth'] = max_depth + meshInput['zExt']
+            self.geom['dz'] = meshInput['dzLAYER']
+            self.geom['dz_ref'] = meshInput['dzREF']
+            self.geom['n_ref'] = meshInput['nREF']
+            self.geom['t_aqf'] = meshInput['t_aqf']
+            self.geom['z_aqf'] = meshInput['z_aqf'] + abs(meshInput['inflow_max_z'])
+            self.create_layer_structure()
+        elif mode == 'layered':
+            for i in range(len(meshInput['LAYERING'])):
+                self.layers[str(i)] = {}
+                self.layers[str(i)]['mat_group'] = meshInput['LAYERING'][i][0]
+                self.layers[str(i)]['n_elems'] = meshInput['LAYERING'][i][1]
+                self.layers[str(i)]['elem_thickness'] = meshInput['LAYERING'][i][2]      
         self.write_GMSH_mesh()
         self.extrude_mesh()
         self.compute_BHE_elements()
@@ -198,61 +210,90 @@ class BHEMesh():
         n_BHEs = len(self.BHEs)
         n_add_points = len(self.add_points)
         cnt_pnt = 9
+        point_idx = 0
+        line_idx = 0
+        lines_list = []
         gmsh.initialize()
         gmsh.model.add(self.prefix)
-        gmsh.model.geo.add_point(-self.geom["width"]/2, 0, 0, self.geom["elem_size"][1], 1)
-        gmsh.model.geo.add_point(self.geom["width"]/2, 0, 0, self.geom["elem_size"][1], 2)
-        gmsh.model.geo.add_point(self.geom["width"]/2, self.geom["length"], 0, self.geom["elem_size"][1], 3)
-        gmsh.model.geo.add_point(-self.geom["width"]/2, self.geom["length"], 0, self.geom["elem_size"][1], 4)
-        gmsh.model.geo.add_line(1, 2, 1)
-        gmsh.model.geo.add_line(2, 3, 2)
-        gmsh.model.geo.add_line(3, 4, 3)
-        gmsh.model.geo.add_line(4, 1, 4)
-        gmsh.model.geo.addCurveLoop([1, 2, 3, 4], 1)
+        point_idx +=1
+        gmsh.model.geo.add_point(-self.geom["width"]/2, 0, 0, self.geom["elem_size"], point_idx)
+        point_idx +=1
+        gmsh.model.geo.add_point(self.geom["width"]/2, 0, 0, self.geom["elem_size"], point_idx)
+        point_idx +=1
+        gmsh.model.geo.add_point(self.geom["width"]/2, self.geom["length"], 0, self.geom["elem_size"], point_idx)
+        point_idx +=1
+        gmsh.model.geo.add_point(-self.geom["width"]/2, self.geom["length"], 0, self.geom["elem_size"], point_idx)
+        line_idx += 1
+        gmsh.model.geo.add_line(line_idx, point_idx - 2, point_idx - 3)
+        lines_list.append(line_idx)
+        line_idx += 1
+        gmsh.model.geo.add_line(line_idx, point_idx - 1, point_idx - 2)
+        lines_list.append(line_idx)
+        line_idx += 1
+        gmsh.model.geo.add_line(line_idx, point_idx, point_idx - 1)
+        lines_list.append(line_idx)
+        line_idx += 1
+        gmsh.model.geo.add_line(line_idx, point_idx - 3, point_idx)
+        lines_list.append(line_idx)
+        gmsh.model.geo.addCurveLoop(lines_list, 1)
         gmsh.model.geo.addPlaneSurface([1], 1)
-        if self.geom['box'][0] != -1 and self.geom['box'][1] != -1 and self.geom['box'][2] != -1:
-            gmsh.model.geo.add_point(self.geom['box'][1]/2, self.geom['box'][0], 0, self.geom["elem_size"][0], 5)
-            gmsh.model.geo.add_point(-self.geom['box'][1]/2, self.geom['box'][0], 0, self.geom["elem_size"][0], 6)
-            gmsh.model.geo.add_point(-self.geom['box'][1]/2, self.geom['box'][0] + self.geom['box'][2], 0, self.geom["elem_size"][0], 7)
-            gmsh.model.geo.add_point(self.geom['box'][1]/2, self.geom['box'][0] + self.geom['box'][2], 0, self.geom["elem_size"][0], 8)
-            gmsh.model.geo.add_line(5, 6, 5)
-            gmsh.model.geo.add_line(6, 7, 6)
-            gmsh.model.geo.add_line(7, 8, 7)
-            gmsh.model.geo.add_line(8, 5, 8)
-            gmsh.model.geo.synchronize()
-            gmsh.model.mesh.embed(1, [5, 6, 7, 8], 2, 1)
+        if 'box' in self.geom:
+            for box in self.geom['box']:
+                lines_list = []
+                point_idx +=1
+                gmsh.model.geo.add_point(box[0] + box[2], box[1], 0, box[4], point_idx)
+                point_idx +=1
+                gmsh.model.geo.add_point(box[0], box[1], 0, box[4], point_idx)
+                point_idx +=1
+                gmsh.model.geo.add_point(box[0], box[1] + box[3], 0, box[4], point_idx)
+                point_idx +=1
+                gmsh.model.geo.add_point(box[0] + box[2], box[1] + box[3], 0, box[4], point_idx)
+                line_idx += 1
+                gmsh.model.geo.add_line(line_idx, point_idx - 2, point_idx - 3)
+                lines_list.append(line_idx)
+                line_idx += 1
+                gmsh.model.geo.add_line(line_idx, point_idx - 1, point_idx - 2)
+                lines_list.append(line_idx)
+                line_idx += 1
+                gmsh.model.geo.add_line(line_idx, point_idx, point_idx - 1)
+                lines_list.append(line_idx)
+                line_idx += 1
+                gmsh.model.geo.add_line(line_idx, point_idx - 3, point_idx)
+                lines_list.append(line_idx)
+                gmsh.model.geo.synchronize()
+                gmsh.model.mesh.embed(1, lines_list, 2, 1)
         # Write BHEs
         # Currently fixed with n=6 nodes
         alpha = 6.134
         point_list = []
         for i in range(n_BHEs):
             delta = alpha * float(self.BHEs[str(i)]['bhe_radius'])
-            gmsh.model.geo.addPoint(self.BHEs[str(i)]['bhe_x'], self.BHEs[str(i)]['bhe_y'], 0, delta, cnt_pnt) 
-            point_list.append(cnt_pnt)
-            cnt_pnt += 1
-            gmsh.model.geo.addPoint(self.BHEs[str(i)]['bhe_x'], self.BHEs[str(i)]['bhe_y'] - delta, 0, delta, cnt_pnt)
-            point_list.append(cnt_pnt)
-            cnt_pnt += 1
-            gmsh.model.geo.addPoint(self.BHEs[str(i)]['bhe_x'], self.BHEs[str(i)]['bhe_y'] + delta, 0, delta, cnt_pnt)
-            point_list.append(cnt_pnt)
-            cnt_pnt += 1
-            gmsh.model.geo.addPoint(self.BHEs[str(i)]['bhe_x'] + 0.866*delta, self.BHEs[str(i)]['bhe_y'] + 0.5*delta, 0, delta, cnt_pnt)
-            point_list.append(cnt_pnt)
-            cnt_pnt += 1
-            gmsh.model.geo.addPoint(self.BHEs[str(i)]['bhe_x'] - 0.866*delta, self.BHEs[str(i)]['bhe_y'] + 0.5*delta, 0, delta, cnt_pnt)
-            point_list.append(cnt_pnt)
-            cnt_pnt += 1
-            gmsh.model.geo.addPoint(self.BHEs[str(i)]['bhe_x'] + 0.866*delta, self.BHEs[str(i)]['bhe_y'] - 0.5*delta, 0, delta, cnt_pnt)
-            point_list.append(cnt_pnt)
-            cnt_pnt += 1
-            gmsh.model.geo.addPoint(self.BHEs[str(i)]['bhe_x'] - 0.866*delta, self.BHEs[str(i)]['bhe_y'] - 0.5*delta, 0, delta, cnt_pnt)
-            point_list.append(cnt_pnt)
-            cnt_pnt += 1
+            point_idx += 1
+            gmsh.model.geo.addPoint(self.BHEs[str(i)]['bhe_x'], self.BHEs[str(i)]['bhe_y'], 0, delta, point_idx) 
+            point_list.append(point_idx)
+            point_idx += 1
+            gmsh.model.geo.addPoint(self.BHEs[str(i)]['bhe_x'], self.BHEs[str(i)]['bhe_y'] - delta, 0, delta, point_idx)
+            point_list.append(point_idx)
+            point_idx += 1
+            gmsh.model.geo.addPoint(self.BHEs[str(i)]['bhe_x'], self.BHEs[str(i)]['bhe_y'] + delta, 0, delta, point_idx)
+            point_list.append(point_idx)
+            point_idx += 1
+            gmsh.model.geo.addPoint(self.BHEs[str(i)]['bhe_x'] + 0.866*delta, self.BHEs[str(i)]['bhe_y'] + 0.5*delta, 0, delta, point_idx)
+            point_list.append(point_idx)
+            point_idx += 1
+            gmsh.model.geo.addPoint(self.BHEs[str(i)]['bhe_x'] - 0.866*delta, self.BHEs[str(i)]['bhe_y'] + 0.5*delta, 0, delta, point_idx)
+            point_list.append(point_idx)
+            point_idx += 1
+            gmsh.model.geo.addPoint(self.BHEs[str(i)]['bhe_x'] + 0.866*delta, self.BHEs[str(i)]['bhe_y'] - 0.5*delta, 0, delta, point_idx)
+            point_list.append(point_idx)
+            point_idx += 1
+            gmsh.model.geo.addPoint(self.BHEs[str(i)]['bhe_x'] - 0.866*delta, self.BHEs[str(i)]['bhe_y'] - 0.5*delta, 0, delta, point_idx)
+            point_list.append(point_idx)
         if n_add_points > 0:
             for j in range(n_add_points):
-                gmsh.model.geo.addPoint(self.add_points[str(j)]['x'], self.add_points[str(j)]['y'], 0, self.add_points[str(j)]['delta'], cnt_pnt)
-                point_list.append(cnt_pnt)
-                cnt_pnt += 1
+                point_idx += 1
+                gmsh.model.geo.addPoint(self.add_points[str(j)]['x'], self.add_points[str(j)]['y'], 0, self.add_points[str(j)]['delta'], point_idx)
+                point_list.append(point_idx)
         gmsh.model.geo.synchronize()
         gmsh.model.mesh.embed(0, point_list, 2, 1)
         gmsh.option.setNumber("Mesh.MshFileVersion", 2.)
@@ -341,6 +382,7 @@ class BHEMesh():
     def compute_BHE_elements(self):
         n_BHEs = len(self.BHEs)
         n_nodes = len(self.node_array)
+        elem_sum = 0
         self.bhe_array=[]
         # Loop over BHEs
         for i in range(n_BHEs):
@@ -353,14 +395,17 @@ class BHEMesh():
                 if self.node_array[j][0] == self.BHEs[repr(i)]['bhe_x'] and self.node_array[j][1] == self.BHEs[repr(i)]['bhe_y'] and self.node_array[j][2] <= self.BHEs[repr(i)]['bhe_top'] and self.node_array[j][2] >= self.BHEs[repr(i)]['bhe_bottom']:
                     bhe_nodes.append(j)
             if self.bhe_array== []:
-                self.bhe_array = np.zeros(((len(bhe_nodes)-1)*n_BHEs,3), dtype = int)
+                self.bhe_array = np.zeros(((len(bhe_nodes)-1),3), dtype = int)
+            else:
+                self.bhe_array = np.append(self.bhe_array, np.zeros(((len(bhe_nodes)-1),3), dtype = int), axis = 0)
             n_BHE_elems = len(bhe_nodes) -1
             # Loop over and create BHE elements
             for j in range(n_BHE_elems): 
                 # Assign element data
-                self.bhe_array[(i+1)*j][0] = int(self.cnt_mat_groups)
-                self.bhe_array[(i+1)*j][1] = bhe_nodes[j]
-                self.bhe_array[(i+1)*j][2] = bhe_nodes[j + 1]
+                self.bhe_array[elem_sum + j][0] = int(self.cnt_mat_groups)
+                self.bhe_array[elem_sum + j][1] = bhe_nodes[j]
+                self.bhe_array[elem_sum + j][2] = bhe_nodes[j + 1]
+            elem_sum += n_BHE_elems
         print(" - BHE meshing successful")
 
 
@@ -452,7 +497,7 @@ class BHEMesh():
             mesh_data.SetPoints(points)
         # Write Mesh Elements
         prism_elements = np.zeros((len(self.prism_array),7), dtype=np.int64)
-        bhe_elements = self.bhe_array
+        bhe_elements = self.bhe_array.copy()
         material_ID = []
         element_type = []
         for i in range(len(self.prism_array)):
@@ -467,7 +512,7 @@ class BHEMesh():
             material_ID.append(self.prism_array[i][0])
         # Write BHE Elements
         for i in range(len(self.bhe_array)):
-            bhe_elements[i][0] = 2
+            bhe_elements[i][0] = 2 ##2 is number of nodes of the Element 
             element_type.append(VTK_LINE)
             material_ID.append(self.bhe_array[i][0])
         elements = np.append(prism_elements.ravel(),bhe_elements.ravel())
@@ -483,17 +528,32 @@ class BHEMesh():
         writer.Write()
         
 
-    def extract_surfaces(self, IC = []):
+    def extract_surfaces(self, sf_types=[], IC = []):
         angle = 0 ## tolerance for faceangle
         path = []
         normals = {}   
-        normals['Top'] =    {'normal' : [0, 0, 1],
-                             'suffix' : "topsf"} 
+        normals['Top'] =  {'normal' : [0, 0, 1],
+                                'suffix' : "topsf"} 
         normals['Bottom'] = {'normal' : [0, 0, -1],
-                             'suffix' : "bottomsf"} 
-        if not self.geom['t_aqf'] == 0: 
-            normals['Inflow'] = {'normal' : [0, -1, 0],
-                                 'suffix' : "inflowsf"}
+                                'suffix' : "bottomsf"}
+        normals['Back'] = {'normal' : [0, -1, 0],
+                                'suffix' : "backsf"}
+        normals['Front'] = {'normal' : [0, 1, 0],
+                                'suffix' : "frontsf"}
+        normals['Left'] = {'normal' : [1, 0, 0],
+                                'suffix' : "leftsf"}
+        normals['Right'] = {'normal' : [-1, 0, 0],
+                                'suffix' : "rightsf"}
+
+        normals['Back_inflow'] = normals['Back'].copy()
+        normals['Back_inflow']['suffix'] = "Back_inflow"
+        normals['Front_inflow'] = normals['Front'].copy()
+        normals['Front_inflow']['suffix'] = "Front_inflow"
+        normals['Left_inflow'] = normals['Left'].copy()
+        normals['Left_inflow']['suffix'] = "Left_inflow"
+        normals['Right_inflow'] = normals['Right'].copy()
+        normals['Right_inflow']['suffix'] = "Right_inflow"    
+            
         for element in range(len(self.prism_array)):
             if element < self.n_elems_in_plane:
                 node_1 = np.where(self.prism_array[:,1:]==self.prism_array[element][1])
@@ -518,7 +578,13 @@ class BHEMesh():
                     self.neighbors[element][2] = self.neighbors[element-self.n_elems_in_plane][2] + self.n_elems_in_plane
                 if not self.neighbors[element-self.n_elems_in_plane][3] == -1:
                     self.neighbors[element][3] = self.neighbors[element-self.n_elems_in_plane][3] + self.n_elems_in_plane
-        for surface in normals:
+        for surface in sf_types:
+            if '_inflow' in surface and 't_aqf' in self.geom:
+                if self.geom['t_aqf'] == 0:
+                    sf_types.remove(surface)
+                    continue ## Testen
+            elif '_inflow' in surface and not 't_aqf' in self.geom:
+                raise KeyError("The '_inflow' option can only be used in 'simple' mode")
             suffix = normals[surface]['suffix']
             len_normal = np.sqrt(normals[surface]['normal'][0]**2 + normals[surface]['normal'][1]**2 + normals[surface]['normal'][2]**2)
             norm_dir = [normals[surface]['normal'][0]/len_normal, normals[surface]['normal'][1]/len_normal, normals[surface]['normal'][2]/len_normal]
@@ -541,7 +607,7 @@ class BHEMesh():
                             len_cross_uv = np.sqrt(cross_uv[0]**2 + cross_uv[1]**2 + cross_uv[2]**2)
                             s = [cross_uv[0]/len_cross_uv, cross_uv[1]/len_cross_uv, cross_uv[2]/len_cross_uv]
                             if s[0]*norm_dir[0] + s[1]*norm_dir[1] + s[2]*norm_dir[2] >= cos_theta:
-                                if surface == 'Inflow' and -self.geom['z_aqf'] < 0:
+                                if '_inflow' in surface and -self.geom['z_aqf'] < 0:
                                     max_z = -self.geom['z_aqf']
                                     min_z = -(self.geom['z_aqf'] + self.geom['t_aqf'])
                                     if not self.remove_mesh_elements(max_z, min_z, node_ids):
