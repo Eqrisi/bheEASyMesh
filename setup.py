@@ -8,7 +8,7 @@ README = open("README.md").read()
 
 
 setup(name="bheEASyMesh",
-      version='0.2',
+      version='0.2.0',
       maintainer="Simon Richter",
       maintainer_email="simon.richter@htwk-leipzig.de",
       long_description=README,
