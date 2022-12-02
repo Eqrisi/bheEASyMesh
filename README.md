@@ -25,6 +25,6 @@ For more instructions, see Meshing_example.ipynb, where there are tutorials for 
 ====================================<br />
 Diersch et al. (2011): Finite element modeling of borehole heat exchanger systems Part 2.Numerical simulation. In: Computers & Geosciences 37, pages 1136-1147.<br />
 
-Geuzaine C et al. (2009) Gmsh: A 3-D finite element mesh generator with built-in pre- and post-processing facilities. International Journal for Numerical Methods in Engineering 79, pages 1309–133.
+Geuzaine C et al. (2009) Gmsh: A 3-D finite element mesh generator with built-in pre- and post-processing facilities. International Journal for Numerical Methods in Engineering 79, pages 1309-1331.
 
 Shao et al. (2016): Geoenergy Modeling II Shallow Geothermal Systems. Springer.

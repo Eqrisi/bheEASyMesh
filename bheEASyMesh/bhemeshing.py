@@ -549,13 +549,13 @@ class BHEMesh():
                                 'suffix' : "rightsf"}
 
         normals['Back_inflow'] = normals['Back'].copy()
-        normals['Back_inflow']['suffix'] = "Back_inflow"
+        normals['Back_inflow']['suffix'] = "Back_inflowsf"
         normals['Front_inflow'] = normals['Front'].copy()
-        normals['Front_inflow']['suffix'] = "Front_inflow"
+        normals['Front_inflow']['suffix'] = "Front_inflowsf"
         normals['Left_inflow'] = normals['Left'].copy()
-        normals['Left_inflow']['suffix'] = "Left_inflow"
+        normals['Left_inflow']['suffix'] = "Left_inflowsf"
         normals['Right_inflow'] = normals['Right'].copy()
-        normals['Right_inflow']['suffix'] = "Right_inflow"    
+        normals['Right_inflow']['suffix'] = "Right_inflowsf"    
             
         for element in range(len(self.prism_array)):
             if element < self.n_elems_in_plane:
