@@ -1,5 +1,5 @@
 # bheEASyMesh
-Tool for  building simple VTK unstructured grid meshes (3D Prism) with BHEs, for extracting surface meshes and for appling temperature IC's to be used in OpenGeoSys 6 HeatTransportBHE simulations. Meshing is based on Philip Heins Bhe_Meshing Tool (Shao et al., 2016)and uses GMSH (Geuzaine et al., 2009).<br />
+Tool for creating simple VTK unstructured grid meshes (3D prism elements) with BHEs (line elements) for use in OpenGeoSys 6 HeatTransportBHE simulations. Besides, the extraction of surface meshes and the application of temperature ICs is possible. The meshing is based on the Bhe_Meshing tool by Philip Hein (Shao et al., 2016) and uses GMSH (Geuzaine et al., 2009).<br />
 Meshes contain:<br />
     &emsp;- 3D prism mesh with horizontal element layers<br />
     &emsp;- A selected number of BHEs, which are represented as line elements<br />

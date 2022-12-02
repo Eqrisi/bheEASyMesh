@@ -1,4 +1,3 @@
-import subprocess
 import gmsh
 import numpy as np
 from vtk import *
