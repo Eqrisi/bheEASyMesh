@@ -236,6 +236,14 @@ class BHEMesh():
         gmsh.model.geo.addPlaneSurface([1], 1)
         if 'box' in self.geom:
             for i in self.geom['box']:
+                if self.geom['box'][i]['Origin'][0] <= -0.5*self.geom['width'] or self.geom['box'][i]['Origin'][0] >= 0.5*self.geom['width']:
+                    raise ValueError ("x-coordinate of box " + str(i) + " origin is outside the mesh")
+                elif self.geom['box'][i]['Origin'][0] + self.geom['box'][i]['Width'] >= 0.5*self.geom['width'] or self.geom['box'][i]['Origin'][0] + self.geom['box'][i]['Width'] <= -0.5*self.geom['width']: 
+                    raise ValueError ("x-Widht of box " + str(i) + " is outside the mesh")
+                elif self.geom['box'][i]['Origin'][1] <= 0 or self.geom['box'][i]['Origin'][1] >= self.geom["length"]: 
+                    raise ValueError ("y-Origin of box " + str(i) + " origin is outside the mesh")
+                elif self.geom['box'][i]['Length'] >= self.geom["length"] or self.geom['box'][i]['Origin'][1] + self.geom['box'][i]['Length'] <= 0:
+                    raise ValueError ("y-length of box " + str(i) + " is outside the mesh")
                 lines_list = []
                 point_idx +=1
                 gmsh.model.geo.add_point(self.geom['box'][i]['Origin'][0] + self.geom['box'][i]['Width'], self.geom['box'][i]['Origin'][1], 0, self.geom['box'][i]['Elem_size'], point_idx)
@@ -264,6 +272,10 @@ class BHEMesh():
         alpha = 6.134
         point_list = []
         for i in range(n_BHEs):
+            if self.BHEs[str(i)]['bhe_x'] <= -0.5*self.geom['width'] or self.BHEs[str(i)]['bhe_x'] >= 0.5*self.geom['width']:
+                    raise ValueError ("x-coordinate of bhe " + str(i) + " is outside the mesh")
+            if self.BHEs[str(i)]['bhe_y'] <= 0 or self.BHEs[str(i)]['bhe_y'] >= self.geom['length']:
+                raise ValueError ("y-coordinate of bhe " + str(i) + " is outside the mesh")
             delta = alpha * float(self.BHEs[str(i)]['bhe_radius'])
             point_idx += 1
             gmsh.model.geo.addPoint(self.BHEs[str(i)]['bhe_x'], self.BHEs[str(i)]['bhe_y'], 0, delta, point_idx) 
@@ -289,6 +301,10 @@ class BHEMesh():
         if n_add_points > 0:
             for j in range(n_add_points):
                 point_idx += 1
+                if self.add_points[str(j)]['x'] <= -0.5*self.geom['width'] or self.add_points[str(j)]['x'] >= 0.5*self.geom['width']:
+                    raise ValueError ("x-coordinate of add-point " + str(j) + " is outside the mesh")
+                if self.add_points[str(j)]['y'] <= 0 or self.add_points[str(j)]['y'] >= self.geom['length']:
+                    raise ValueError ("y-coordinate of add-point " + str(j) + " is outside the mesh")
                 gmsh.model.geo.addPoint(self.add_points[str(j)]['x'], self.add_points[str(j)]['y'], 0, self.add_points[str(j)]['delta'], point_idx)
                 point_list.append(point_idx)
         gmsh.model.geo.synchronize()
