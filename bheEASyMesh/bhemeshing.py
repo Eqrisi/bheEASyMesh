@@ -51,7 +51,7 @@ class BHEMesh():
                 this_point['y'] = meshInput['ADD_POINTS'][i][1]
                 this_point['delta'] = meshInput['ADD_POINTS'][i][2]
                 self.add_points[str(len(self.add_points))] = this_point
-        if mode == 'simple':
+        if mode == 'simple' or mode == 'Simple':
             self.geom['depth'] = max_depth + meshInput['zExt']
             self.geom['dz'] = meshInput['dzLAYER']
             self.geom['dz_ref'] = meshInput['dzREF']
@@ -59,12 +59,14 @@ class BHEMesh():
             self.geom['t_aqf'] = meshInput['t_aqf']
             self.geom['z_aqf'] = meshInput['z_aqf'] + abs(meshInput['inflow_max_z'])
             self.create_layer_structure()
-        elif mode == 'layered':
+        elif mode == 'layered' or mode == 'Layered':
             for i in range(len(meshInput['LAYERING'])):
                 self.layers[str(i)] = {}
                 self.layers[str(i)]['mat_group'] = meshInput['LAYERING'][i][0]
                 self.layers[str(i)]['n_elems'] = meshInput['LAYERING'][i][1]
-                self.layers[str(i)]['elem_thickness'] = meshInput['LAYERING'][i][2]      
+                self.layers[str(i)]['elem_thickness'] = meshInput['LAYERING'][i][2] 
+        else:
+            raise KeyError("'" + mode + "' is not a known mode, please choose 'layered' or 'simple' as mode")     
         self.write_GMSH_mesh()
         self.extrude_mesh()
         self.compute_BHE_elements()
@@ -551,26 +553,36 @@ class BHEMesh():
         path = []
         normals = {}   
         normals['Top'] =  {'normal' : [0, 0, 1],
-                                'suffix' : "topsf"} 
+                                'suffix' : "topsf"}
+        normals['top'] =  normals['Top']  
         normals['Bottom'] = {'normal' : [0, 0, -1],
                                 'suffix' : "bottomsf"}
+        normals['bottom'] =  normals['Bottom']  
         normals['Back'] = {'normal' : [0, -1, 0],
                                 'suffix' : "backsf"}
+        normals['back'] =  normals['Back']  
         normals['Front'] = {'normal' : [0, 1, 0],
                                 'suffix' : "frontsf"}
+        normals['front'] =  normals['Front']   
         normals['Left'] = {'normal' : [1, 0, 0],
                                 'suffix' : "leftsf"}
+        normals['left'] =  normals['Left']  
         normals['Right'] = {'normal' : [-1, 0, 0],
                                 'suffix' : "rightsf"}
-
+        normals['right'] =  normals['Right']
+        
         normals['Back_inflow'] = normals['Back'].copy()
-        normals['Back_inflow']['suffix'] = "Back_inflowsf"
+        normals['Back_inflow']['suffix'] = "back_inflowsf"
+        normals['back_inflow'] =  normals['Back_inflow']
         normals['Front_inflow'] = normals['Front'].copy()
-        normals['Front_inflow']['suffix'] = "Front_inflowsf"
+        normals['Front_inflow']['suffix'] = "front_inflowsf"
+        normals['front_inflow'] =  normals['Front_inflow']
         normals['Left_inflow'] = normals['Left'].copy()
-        normals['Left_inflow']['suffix'] = "Left_inflowsf"
+        normals['Left_inflow']['suffix'] = "left_inflowsf"
+        normals['left_inflow'] =  normals['Left_inflow']
         normals['Right_inflow'] = normals['Right'].copy()
-        normals['Right_inflow']['suffix'] = "Right_inflowsf"    
+        normals['Right_inflow']['suffix'] = "right_inflowsf"
+        normals['right_inflow'] =  normals['Right_inflow']    
             
         for element in range(len(self.prism_array)):
             if element < self.n_elems_in_plane:

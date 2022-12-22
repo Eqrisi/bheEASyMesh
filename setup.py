@@ -8,10 +8,10 @@ README = open("README.md").read()
 
 
 setup(name="bheEASyMesh",
-      version='v0.2.2',
+      version='v0.2.3',
       maintainer="Simon Richter",
       maintainer_email="simon.richter@htwk-leipzig.de",
-      description="Tool for creating FE meshes for bhe simulations",
+      description="Tool for creating FE-meshes for bhe simulations",
       long_description=README,
       long_description_content_type="text/markdown",
       author="Simon Richter",
